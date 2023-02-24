@@ -1,0 +1,7 @@
+{% extends "baseform.html" %}
+{% block title %}Подтвердите удаление поста{% endblock %}
+{% block header %}
+    <h1>Вы действительно удалить пост?</h1>
+    <p>{{ post.text }}</p>
+{% endblock %}
+{% block button %}Удалить{% endblock %}
