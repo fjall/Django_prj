@@ -32,6 +32,7 @@ class FormsTests(TestCase):
         cls.comment_data = {
             "text": "text",
         }
+        cls.post = Post.objects.create(**cls.post_data)
 
     @classmethod
     def tearDownClass(cls):
@@ -64,43 +65,39 @@ class FormsTests(TestCase):
         self.assertEqual(post.group_id, post_data["group"])
 
     def test_edit_form_saving_changes(self):
-        existing_post = Post.objects.create(
-            text="someoldtext", author=self.user
-        )
         post_data = {
             "text": "somenewtext",
             "group": self.group.id,
         }
         response = self.authorized_client.post(
-            reverse("posts:post_edit", args=(existing_post.id,)), post_data
+            reverse("posts:post_edit", args=(self.post.id,)), post_data
         )
         self.assertRedirects(
-            response, reverse("posts:post_detail", args=(existing_post.id,))
+            response, reverse("posts:post_detail", args=(self.post.id,))
         )
-        post = Post.objects.get(pk=existing_post.id)
+        post = Post.objects.get(pk=self.post.id)
         self.assertEqual(post.text, post_data["text"])
         self.assertEqual(post.group_id, post_data["group"])
 
     def test_unautorized_cant_create(self):
         post_data = {"text": "test text", "author": self.user}
+        exitsting_posts_count = Post.objects.count()
         self.guest_client.post(reverse("posts:post_create"), post_data)
-        self.assertEqual(Post.objects.count(), 0)
+        self.assertEqual(Post.objects.count(), exitsting_posts_count)
 
     def test_only_author_can_edit(self):
         fiends = (
             (self.guest_client, "unauthorized user"),
             (self.fiend_authorized_client, "user not author"),
         )
-        post_data = {"text": "reference text", "author": self.user}
         edit_data = {"text": "different text"}
         for fiend, description in fiends:
             with self.subTest(user_type=description):
-                post = Post.objects.create(**post_data)
                 fiend.post(
-                    reverse("posts:post_edit", args=(post.id,)), edit_data
+                    reverse("posts:post_edit", args=(self.post.id,)), edit_data
                 )
-                post.refresh_from_db()
-                self.assertEqual(post.text, post_data["text"])
+                self.post.refresh_from_db()
+                self.assertEqual(self.post.text, self.post_data["text"])
 
     def test_form_with_image_creates_new_record_in_db(self):
         small_gif = (
@@ -129,83 +126,31 @@ class FormsTests(TestCase):
         self.assertEqual(post.image, "posts/small.gif")
 
     def test_authorized_can_comment(self):
-        post = Post.objects.create(**self.post_data)
         response = self.authorized_client.post(
-            reverse("posts:add_comment", args=(post.id,)),
+            reverse("posts:add_comment", args=(self.post.id,)),
             self.comment_data,
         )
         comment = Comment.objects.latest("id")
         self.assertRedirects(
-            response, reverse("posts:post_detail", args=(post.id,))
+            response, reverse("posts:post_detail", args=(self.post.id,))
         )
         self.assertEqual(comment.text, self.comment_data["text"])
 
     def test_unauthorized_cant_comment(self):
-        post = Post.objects.create(**self.post_data)
         response = self.guest_client.post(
-            reverse("posts:add_comment", args=(post.id,)),
+            reverse("posts:add_comment", args=(self.post.id,)),
             self.comment_data,
         )
         self.assertRedirects(
             response,
             (
                 f'{reverse("users:login")}?next='
-                f'{reverse("posts:add_comment", args=(post.id,))}'
+                f'{reverse("posts:add_comment", args=(self.post.id,))}'
             ),
         )
-        self.assertEqual(post.comments.count(), 0)
-
-    # def test_only_authorized_can_comment(self):
-    #     post_data = {"text": "reference text", "author": self.user}
-    #     post = Post.objects.create(**post_data)
-    #     post.refresh_from_db()
-    #     comment_data = {"text": "text"}
-    #     users_with_assert_info = (
-    #         (
-    #             self.guest_client,
-    #             f'{reverse("users:login")}?next='
-    #             f'{reverse("posts:add_comment", args=(post.id,))}',
-    #             0,
-    #         ),
-    #         (
-    #             self.authorized_client,
-    #             reverse("posts:post_detail", args=(post.id,)),
-    #             1,
-    #         ),
-    #     )
-    #     for (
-    #         user,
-    #         expected_url,
-    #         expected_comments_count,
-    #     ) in users_with_assert_info:
-    #         with self.subTest():
-    #             response = user.post(
-    #                 reverse("posts:add_comment", args=(post.id,)),
-    #                 comment_data,
-    #             )
-    #             self.assertRedirects(response, expected_url)
-    #             self.assertEqual(
-    #                 post.comments.count(), expected_comments_count
-    #             )
-    #             if expected_comments_count == 1:
-    #                 comment = Comment.objects.latest("id")
-    #                 self.assertEqual(comment.text, comment_data["text"])
-
-    # def test_authorized_can_delete(self):
-    #     post = Post.objects.create(
-    #         text="anytext",
-    #         author=self.user,
-    #     )
-    #     self.authorized_client.post(
-    #         reverse("posts:post_delete", args=(post.id,))
-    #     )
-    #     self.assertEqual(Post.objects.count(), 0)
+        self.assertEqual(self.post.comments.count(), 0)
 
     def test_only_author_can_delete_post(self):
-        post = Post.objects.create(
-            text="anytext",
-            author=self.user,
-        )
         users_with_assert_info = (
             (self.guest_client, "unauthorized user", 1),
             (self.fiend_authorized_client, "fiend user", 1),
@@ -218,7 +163,7 @@ class FormsTests(TestCase):
         ) in users_with_assert_info:
             with self.subTest(user_type=description):
                 response = user.post(
-                    reverse("posts:post_delete", args=(post.id,))
+                    reverse("posts:post_delete", args=(self.post.id,))
                 )
                 self.assertEqual(
                     Post.objects.count(), expected_post_count_after_del
