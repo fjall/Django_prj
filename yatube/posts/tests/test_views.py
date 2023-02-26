@@ -9,7 +9,7 @@ from django.core.paginator import Page
 from django.test import Client, TestCase, override_settings
 from django.urls import reverse
 
-from ..models import Group, Post, User
+from ..models import Follow, Group, Post, User
 
 
 class PostPagesTest(TestCase):
@@ -272,11 +272,11 @@ class SubscriptionViewTest(TestCase):
         self.subscriber_client.force_login(self.user)
         self.not_subscriber_client = Client()
         self.not_subscriber_client.force_login(self.not_subscriber)
+
+    def test_user_can_manage_subscriptions(self):
         self.subscriber_client.get(
             reverse("posts:profile_follow", args=[self.author])
         )
-
-    def test_user_can_manage_subscriptions(self):
         self.assertTrue(self.user.follower.filter(author=self.author).exists())
         self.subscriber_client.get(
             reverse("posts:profile_unfollow", args=[self.author])
@@ -286,6 +286,10 @@ class SubscriptionViewTest(TestCase):
         )
 
     def test_post_arrives_at_follow_index_only_for_subscribers(self):
+        Follow.objects.create(
+            author=self.author,
+            user=self.user,
+        )
         Post.objects.create(
             text="anytext",
             author=self.author,

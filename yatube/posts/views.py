@@ -127,8 +127,6 @@ def add_comment(request, post_id):
 
 @login_required
 def follow_index(request):
-    # информация о текущем пользователе доступна в переменной request.user
-    # ...
     post_list = Post.objects.filter(author__following__user=request.user)
     context = {
         "page_obj": get_paginator(post_list, POSTS_COUNT, request),

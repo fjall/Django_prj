@@ -9,6 +9,7 @@ from django.urls import reverse
 
 from ..models import Comment, Group, Post, User
 
+
 TEMP_MEDIA_ROOT = tempfile.mkdtemp(dir=settings.BASE_DIR)
 
 
@@ -24,6 +25,13 @@ class FormsTests(TestCase):
             description="test_group_description",
             slug="test_slug",
         )
+        cls.post_data = {
+            "text": "reference text",
+            "author": cls.user,
+        }
+        cls.comment_data = {
+            "text": "text",
+        }
 
     @classmethod
     def tearDownClass(cls):
@@ -120,74 +128,68 @@ class FormsTests(TestCase):
         self.assertEqual(post.text, form_data["text"])
         self.assertEqual(post.image, "posts/small.gif")
 
-    # def test_authorized_can_comment(self):
-    #     post_data = {"text": "reference text", "author": self.user}
-    #     post = Post.objects.create(**post_data)
-    #     post.refresh_from_db()
-    #     comment_data = {"text": "text"}
-    #     response = self.authorized_client.post(
-    #         reverse("posts:add_comment", args=(post.id,)),
-    #         comment_data,
-    #     )
-    #     comment = Comment.objects.latest("id")
-    #     self.assertRedirects(
-    #         response, reverse("posts:post_detail", args=(post.id,))
-    #     )
-    #     self.assertEqual(comment.text, comment_data["text"])
+    def test_authorized_can_comment(self):
+        post = Post.objects.create(**self.post_data)
+        response = self.authorized_client.post(
+            reverse("posts:add_comment", args=(post.id,)),
+            self.comment_data,
+        )
+        comment = Comment.objects.latest("id")
+        self.assertRedirects(
+            response, reverse("posts:post_detail", args=(post.id,))
+        )
+        self.assertEqual(comment.text, self.comment_data["text"])
 
-    # def test_unauthorized_cant_comment(self):
-    #     post_data = {"text": "reference text", "author": self.user}
-    #     post = Post.objects.create(**post_data)
-    #     post.refresh_from_db()
-    #     comment_data = {"text": "text"}
-    #     response = self.guest_client.post(
-    #         reverse("posts:add_comment", args=(post.id,)),
-    #         comment_data,
-    #     )
-    #     self.assertRedirects(
-    #         response,
-    #         (
-    #             f'{reverse("users:login")}?next='
-    #             f'{reverse("posts:add_comment", args=(post.id,))}'
-    #         ),
-    #     )
-    #     self.assertEqual(post.comments.count(), 0)
-
-    def test_only_authorized_can_comment(self):
-        post_data = {"text": "reference text", "author": self.user}
-        post = Post.objects.create(**post_data)
-        post.refresh_from_db()
-        comment_data = {"text": "text"}
-        users_with_assert_info = (
+    def test_unauthorized_cant_comment(self):
+        post = Post.objects.create(**self.post_data)
+        response = self.guest_client.post(
+            reverse("posts:add_comment", args=(post.id,)),
+            self.comment_data,
+        )
+        self.assertRedirects(
+            response,
             (
-                self.guest_client,
                 f'{reverse("users:login")}?next='
-                f'{reverse("posts:add_comment", args=(post.id,))}',
-                0,
-            ),
-            (
-                self.authorized_client,
-                reverse("posts:post_detail", args=(post.id,)),
-                1,
+                f'{reverse("posts:add_comment", args=(post.id,))}'
             ),
         )
-        for (
-            user,
-            expected_url,
-            expected_comments_count,
-        ) in users_with_assert_info:
-            with self.subTest():
-                response = user.post(
-                    reverse("posts:add_comment", args=(post.id,)),
-                    comment_data,
-                )
-                self.assertRedirects(response, expected_url)
-                self.assertEqual(
-                    post.comments.count(), expected_comments_count
-                )
-                if expected_comments_count == 1:
-                    comment = Comment.objects.latest("id")
-                    self.assertEqual(comment.text, comment_data["text"])
+        self.assertEqual(post.comments.count(), 0)
+
+    # def test_only_authorized_can_comment(self):
+    #     post_data = {"text": "reference text", "author": self.user}
+    #     post = Post.objects.create(**post_data)
+    #     post.refresh_from_db()
+    #     comment_data = {"text": "text"}
+    #     users_with_assert_info = (
+    #         (
+    #             self.guest_client,
+    #             f'{reverse("users:login")}?next='
+    #             f'{reverse("posts:add_comment", args=(post.id,))}',
+    #             0,
+    #         ),
+    #         (
+    #             self.authorized_client,
+    #             reverse("posts:post_detail", args=(post.id,)),
+    #             1,
+    #         ),
+    #     )
+    #     for (
+    #         user,
+    #         expected_url,
+    #         expected_comments_count,
+    #     ) in users_with_assert_info:
+    #         with self.subTest():
+    #             response = user.post(
+    #                 reverse("posts:add_comment", args=(post.id,)),
+    #                 comment_data,
+    #             )
+    #             self.assertRedirects(response, expected_url)
+    #             self.assertEqual(
+    #                 post.comments.count(), expected_comments_count
+    #             )
+    #             if expected_comments_count == 1:
+    #                 comment = Comment.objects.latest("id")
+    #                 self.assertEqual(comment.text, comment_data["text"])
 
     # def test_authorized_can_delete(self):
     #     post = Post.objects.create(
